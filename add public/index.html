@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport">
+<title>GOD • UI — AI Chat</title>
+<style>
+:root{
+  --accent:#ff001e;
+  --bg:#071026;
+  --muted: rgba(255,255,255,0.65);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;}
+body{
+  font-family:"Inter",sans-serif;
+  background:linear-gradient(180deg,#02040a 0%, #071026 60%);
+  color:#e6eef8;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+.topbar{
+  width:100%;
+  position:fixed;
+  top:0;
+  left:0;
+  z-index:40;
+  backdrop-filter: blur(6px);
+  background: linear-gradient(180deg, rgba(7,16,38,0.6), rgba(7,16,38,0.15));
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  padding:14px 24px;
+}
+.topbar .container{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-family:"Orbitron",sans-serif;color:var(--accent);}
+
+.hero{
+  padding-top:120px;
+  display:flex;
+  justify-content:center;
+  width:100%;
+  padding-bottom:60px;
+}
+.big-square{
+  width:100%;
+  max-width:760px;
+  height:580px;
+  background:linear-gradient(180deg, rgba(255,0,30,0.03), rgba(0,200,255,0.02));
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.05);
+  display:flex;
+  flex-direction:column;
+  padding:18px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 10px 30px rgba(2,6,23,0.6);
+}
+
+.chat-box{
+  flex:1;
+  overflow-y:auto;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  scroll-behavior:smooth;
+}
+.msg{
+  padding:10px 14px;
+  border-radius:12px;
+  max-width:75%;
+  font-size:15px;
+  line-height:1.4;
+  word-break:break-word;
+  animation: fadeIn 0.3s ease-in;
+}
+.msg.user{align-self:flex-end;background: linear-gradient(180deg, rgba(255,0,30,0.18), rgba(255,0,30,0.12));color:#fff;}
+.msg.ai{align-self:flex-start;background: rgba(255,255,255,0.06);color:#eaf6ff;}
+
+.input-area{display:flex;gap:10px;margin-top:12px;}
+.text-area{
+  flex:1;
+  resize:none;
+  padding:14px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.08);
+  background:rgba(255,255,255,0.02);
+  color:#e6eef8;
+  font-size:16px;
+  font-family:inherit;
+  height:88px;
+}
+.btn{
+  padding:0 24px;
+  border-radius:10px;
+  border:none;
+  background:var(--accent);
+  color:white;
+  cursor:pointer;
+  font-weight:700;
+  font-size:16px;
+}
+.btn:disabled{opacity:0.6;cursor:not-allowed}
+footer{text-align:center;padding:10px;color:#888;font-size:14px}
+
+.typing{font-style:italic;color:#ff8080;}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+<div class="container">
+<div class="logo"> GOD-UI</div>
+</div>
+</header>
+
+<main class="hero">
+<div aria-label="AI chat box" class="big-square" role="main">
+<div aria-live="polite" class="chat-box" id="chatBox"></div>
+<div class="input-area">
+<textarea class="text-area" id="userText" placeholder="Type your message..."></textarea>
+<button class="btn" id="sendBtn">Send</button>
+</div>
+</div>
+</main>
+
+<footer>© 2025 Made by God</footer>
+
+<script>
+const sendBtn=document.getElementById('sendBtn');
+const input=document.getElementById('userText');
+const chatBox=document.getElementById('chatBox');
+
+sendBtn.addEventListener('click',sendMessage);
+input.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+function appendMessage(text,who){
+  const div=document.createElement('div');
+  div.className='msg '+who;
+  div.textContent=text;
+  chatBox.appendChild(div);
+  chatBox.scrollTop=chatBox.scrollHeight;
+}
+
+function sendMessage(){
+  const text=input.value.trim();
+  if(!text) return;
+  appendMessage(text,'user');
+  input.value='';
+  showTyping();
+
+  // Special rule for "Rehan..."
+  if(text.toLowerCase().startsWith("rehan")){
+    removeTyping();
+    typeWriter("Rehan mera papa hai, mai unko kuch nahi bol sakta.");
+    return;
+  }
+
+  // Call backend API
+  fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: text })
+  })
+  .then(res=>res.json())
+  .then(data=>{
+    removeTyping();
+    if(data.reply && !data.error){
+      typeWriter(data.reply);
+    } else {
+      // fallback to gaali reply
+      typeWriter(getFakeReply());
+    }
+  })
+  .catch(err=>{
+    removeTyping();
+    typeWriter(getFakeReply());
+  });
+}
+
+function showTyping(){
+  const typingDiv=document.createElement('div');
+  typingDiv.className='msg ai typing';
+  typingDiv.textContent="AI is typing...";
+  typingDiv.id="typing";
+  chatBox.appendChild(typingDiv);
+  chatBox.scrollTop=chatBox.scrollHeight;
+}
+
+function removeTyping(){
+  const typingDiv=document.getElementById("typing");
+  if(typingDiv) typingDiv.remove();
+}
+
+function typeWriter(reply){
+  const aiDiv=document.createElement('div');
+  aiDiv.className='msg ai';
+  chatBox.appendChild(aiDiv);
+
+  let i=0;
+  function type(){
+    if(i<reply.length){
+      aiDiv.textContent+=reply.charAt(i);
+      i++;
+      chatBox.scrollTop=chatBox.scrollHeight;
+      setTimeout(type,40);
+    }
+  }
+  type();
+}
+
+// 🚨 Fake Gaali Replies (from your new list only)
+let fakeReplies = [
+  "jhipkali ki chut ka pasina",
+  "kutte ki gaand ka baal todne wala",
+  "suar ki chut ka khoon chaatne wala",
+  "gadhe ke lund ka pasina peene wala",
+  "bandar ki gaand ka tel bechne wala",
+  "bhains ki chut ka paani peene wala",
+  "billi ki chut ke baal todne wala",
+  "chuhe ki gaand ka baal chaatne wala",
+  "kauwe ki chut ka tel nikalne wala",
+  "machhar ki gaand ka khoon peene wala",
+  "machhli ki chut ka pani chaatne wala",
+  "makkhi ki gaand ka ras chaatne wala",
+  "kutti ki chut ke tatte todne wala",
+  "chudne wali maa ki chut faadne wala",
+  "behen ki chut ke baal todne wala",
+  "maa ki chut ka khoon bechne wala",
+  "maa ke lund ka pasina peene wala",
+  "behen ke tatto ka pasina nikalne wala",
+  "lode ke tatte ka tel banane wala",
+  "gand ke baal ka khoon pine wala",
+  "chut ke baal ka tel banane wala",
+  "lund ke tatto ka pasina chaatne wala",
+  "chut faadne wali maa ki gaand todne wala",
+  "behen ki chut faadne wala suar",
+  "maa ke tatte faadne wala gadha",
+  "gand chaatne wali gali ki randi",
+  "chut chaatne wali gali ki randi",
+  "lund chaatne wala gali ka kutta",
+  "tatte chaatne wala gali ka suar",
+  "gaand ka pyas bujhane wala harami",
+  "chut ka pyas bujhane wala harami",
+  "lund todne wala randi ka beta",
+  "maa ki chut todne wala haramzada",
+  "behen ki chut todne wala haramzada",
+  "maa ke tatte todne wala nalayak",
+  "chut ke tel me tatti milane wala",
+  "gaand ke tel me mootne wala harami",
+  "chut ke khoon me hagne wala suar",
+  "maa ki chut ka doodh pine wala kutta",
+  "behen ki chut ka doodh pine wala kutta",
+  "randi ki chut ka doodh pine wala suar",
+  "maa ki chut ka ras chaatne wala nalayak",
+  "behen ki chut ka ras chaatne wala nalayak",
+  "gand ke ras ka pyasa kutta",
+  "maa ke lode ka ras pine wala harami",
+  "behen ke tatte ka ras pine wala harami",
+  "chut ka khoon chaatne wala bhosdike",
+  "gaand ka khoon chaatne wala bhosdike",
+  "laude ke tatte todne wala harami",
+  "maa-behen ki chut ka bazaar lagane wala",
+  "maa ki chut ke baal ghumane wala",
+  "behen ki chut ke baal todne wala",
+  "maa ki gaand ke baal ka tel banane wala",
+  "behen ke gaand ke baal todne wala",
+  "maa ke lode ke baal faadne wala",
+  "behen ke tatto ke baal faadne wala",
+  "maa ki chut ke tatte todne wala",
+  "behen ki chut ke tatte todne wala",
+  "maa ke gaand ke tatte todne wala",
+  "behen ke gaand ke tatte todne wala",
+  "maa ki chut ke ras me tatti milane wala",
+  "behen ki chut ke ras me mootne wala",
+  "maa ke lode ke ras me hagne wala",
+  "behen ke lode ke ras me hagne wala",
+  "maa ke gaand ke ras chaatne wala",
+  "behen ke gaand ke ras chaatne wala",
+  "maa ke tatto ke ras chaatne wala",
+  "behen ke tatto ke ras chaatne wala",
+  "maa ke chut ke khoon peene wala",
+  "behen ke chut ke khoon peene wala",
+  "maa ke gaand ke khoon peene wala",
+  "behen ke gaand ke khoon peene wala",
+  "maa ke lode ke khoon peene wala",
+  "behen ke lode ke khoon peene wala",
+  "maa ke tatte ke khoon peene wala",
+  "behen ke tatte ke khoon peene wala",
+  "maa ke chut ke paani chaatne wala",
+  "behen ke chut ke paani chaatne wala",
+  "maa ke gaand ke paani chaatne wala",
+  "behen ke gaand ke paani chaatne wala",
+  "maa ke lode ke paani chaatne wala",
+  "behen ke lode ke paani chaatne wala",
+  "maa ke tatte ke paani chaatne wala",
+  "behen ke tatte ke paani chaatne wala",
+  "maa ke chut ke tel banane wala",
+  "behen ke chut ke tel banane wala",
+  "maa ke gaand ke tel banane wala",
+  "behen ke gaand ke tel banane wala",
+  "maa ke lode ke tel banane wala",
+  "behen ke lode ke tel banane wala",
+  "maa ke tatte ke tel banane wala",
+  "behen ke tatte ke tel banane wala",
+  "maa ke chut ke doodh banane wala",
+  "behen ke chut ke doodh banane wala",
+  "maa ke gaand ke doodh banane wala",
+  "behen ke gaand ke doodh banane wala",
+  "maa ke lode ke doodh banane wala",
+  "behen ke lode ke doodh banane wala",
+  "maa ke tatte ke doodh banane wala",
+  "behen ke tatte ke doodh banane wala",
+  "maa-behen ki chut aur gaand bechne wala"
+];
+
+// shuffle logic (no repeat)
+let usedReplies = [];
+function getFakeReply(){
+  if(fakeReplies.length===0){
+    fakeReplies = usedReplies;
+    usedReplies = [];
+  }
+  const idx = Math.floor(Math.random()*fakeReplies.length);
+  const reply = fakeReplies.splice(idx,1)[0];
+  usedReplies.push(reply);
+  return reply;
+}
+</script>
+</body>
+</html>
